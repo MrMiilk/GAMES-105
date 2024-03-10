@@ -64,7 +64,6 @@ def part1_simple(viewer, target_pos):
     viewer.run()
     pass
 
-
 def part1_hard(viewer, target_pos):
     """
     完成part1_inverse_kinematics，我们将根节点设在**左脚部**，末端节点设在左手
@@ -105,7 +104,6 @@ def part1_animation(viewer, target_pos):
     handle.update_func(viewer)
     viewer.update_marker_func = handle.update_func
     viewer.run()
-
 
 def part2(viewer, bvh_name):
     motion_data = load_motion_data(bvh_name)
@@ -168,7 +166,7 @@ def main():
     viewer = SimpleViewer()
     
     # part1
-    # part1_simple(viewer, np.array([0.5, 0.75, 0.5]))
+    part1_simple(viewer, np.array([0.5, 0.75, 0.5]))
     # part1_hard(viewer, np.array([0.5, 0.5, 0.5]))
     # part1_animation(viewer, np.array([0.5, 0.5, 0.5]))
     
