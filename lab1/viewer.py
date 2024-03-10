@@ -276,7 +276,6 @@ class SimpleViewer(ShowBase):
 
         self.render.setShaderAuto(True)
 
-    
     def create_joint(self, link_id, position, end_effector=False):
         # create a joint
         box = self.loader.loadModel("material/GroundScene.egg")
@@ -327,7 +326,7 @@ class SimpleViewer(ShowBase):
         return task.cont
     
     def load_character(self):
-        info = np.load('character_model.npy', allow_pickle=True).item()
+        info = np.load('lab1/character_model.npy', allow_pickle=True).item()
         joint_pos = info['joint_pos']
         body_pos = info['body_pos']
         joint_name = info['joint_name']
@@ -403,6 +402,7 @@ class SimpleViewer(ShowBase):
         
         for i in range(length):
             self.set_joint_position_orientation(joint_name_list[i], joint_positions[i], joint_orientations[i])
+    
     def show_rest_pose(self, joint_name, joint_parent, joint_offset):
         length = len(joint_name)
         joint_positions = np.zeros((length, 3), dtype=np.float64)

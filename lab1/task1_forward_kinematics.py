@@ -1,3 +1,13 @@
+'''
+Author: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
+Date: 2024-03-04 10:19:37
+LastEditors: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
+LastEditTime: 2024-03-04 14:14:05
+FilePath: /games105/lab1/task1_forward_kinematics.py
+Description: 
+
+Copyright (c) 2024 by ${git_name_email}, All Rights Reserved. 
+'''
 from viewer import SimpleViewer
 import numpy as np
 from Lab1_FK_answers import *
@@ -71,7 +81,7 @@ def part3_retarget(viewer, T_pose_bvh_path, A_pose_bvh_path):
 def main():
     # create a viewer
     viewer = SimpleViewer()
-    bvh_file_path = "data/walk60.bvh"
+    bvh_file_path = "lab1/data/walk60.bvh"
 
     # 请取消注释需要运行的代码
     # part1
@@ -82,7 +92,7 @@ def main():
     # part2_animation(viewer, bvh_file_path)
 
     # part3
-    part3_retarget(viewer, "data/walk60.bvh", "data/A_pose_run.bvh")
+    part3_retarget(viewer, "lab1/data/walk60.bvh", "lab1/data/A_pose_run.bvh")
 
 
 if __name__ == "__main__":
