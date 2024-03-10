@@ -1,8 +1,8 @@
 '''
 Author: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
 Date: 2024-03-04 10:19:37
-LastEditors: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
-LastEditTime: 2024-03-10 12:42:02
+LastEditors: Miilk 1024109095@qq.com
+LastEditTime: 2024-03-10 13:15:51
 FilePath: /games105/lab1/Lab2_IK_answers.py
 Description: 
 
@@ -14,6 +14,13 @@ import torch.optim as optim
 import torch.nn as nn
 from scipy.spatial.transform import Rotation as R
 
+def orthogonal_regularization(matrix):
+    """
+    对矩阵进行正交正则化。
+    """
+    with torch.no_grad():
+        u, _, v = torch.svd(matrix, some=True)
+        matrix.copy_(torch.matmul(u, v.t()))
 
 def part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, target_pose):
     """
@@ -38,7 +45,7 @@ def part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, tar
     joint_offset_t = [torch.tensor(item) for item in joint_offset]
     joint_rot_t = [
         torch.tensor(
-            (R.from_quat(joint_orientations[i]).inv().as_quat() *
+            (R.from_quat(joint_orientations[i]).inv()  *
             R.from_quat(joint_orientations[joint_parent[i]])).as_matrix(), 
         requires_grad=True)
         for i in range(len(joint_positions))
@@ -68,6 +75,7 @@ def part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, tar
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        for item in joint_rot_t: orthogonal_regularization(item)
     print("loss: ", loss)
     joint_orientations[0] = R.from_matrix(joint_rot_t[0].detach().numpy()).as_quat()
     for i in range(1, len(joint_positions)):
