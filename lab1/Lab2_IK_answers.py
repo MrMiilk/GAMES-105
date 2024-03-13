@@ -2,7 +2,7 @@
 Author: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
 Date: 2024-03-04 10:19:37
 LastEditors: Miilk 1024109095@qq.com
-LastEditTime: 2024-03-13 21:27:09
+LastEditTime: 2024-03-13 22:42:49
 FilePath: /games105/lab1/Lab2_IK_answers.py
 Description: 
 
@@ -14,6 +14,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 import torch.nn as nn
 from scipy.spatial.transform import Rotation as R
+from MetaData import MetaData
 
 def orthogonal_regularization(matrix):
     """
@@ -135,19 +136,7 @@ def quaternion_loss(q):
     """额外的损失项，确保四元数接近单位四元数"""
     return (q.norm(p=2, dim=0)**2 - 1)**2
 
-def part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, target_pose):
-    """
-    完成函数，计算逆运动学
-    输入: 
-        meta_data: 为了方便，将一些固定信息进行了打包，见上面的meta_data类
-        joint_positions: 当前的关节位置，是一个numpy数组，shape为(M, 3)，M为关节数
-        joint_orientations: 当前的关节朝向，是一个numpy数组，shape为(M, 4)，M为关节数
-        target_pose: 目标位置，是一个numpy数组，shape为(3,)
-    输出:
-        经过IK后的姿态
-        joint_positions: 计算得到的关节位置，是一个numpy数组，shape为(M, 3)，M为关节数
-        joint_orientations: 计算得到的关节朝向，是一个numpy数组，shape为(M, 4)，M为关节数
-    """
+def do_optm(meta_data, joint_positions, joint_orientations, target_pose, lr=0.01):
     path, path_name, path1, path2 = meta_data.get_path_from_root_to_end()
     joint_parent = meta_data.joint_parent
     target_pose_t = torch.tensor(target_pose)
@@ -161,7 +150,7 @@ def part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, tar
             quaternion_multiply(
                 quaternion_inverse(torch.tensor(joint_orientations[joint_parent[i]])), 
                 torch.tensor(joint_orientations[i])
-            ), requires_grad=True)
+            )).clone().detach().requires_grad_(True)
         if i in path else
         torch.tensor(
             quaternion_multiply(
@@ -173,11 +162,13 @@ def part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, tar
     joint_positions_t = [torch.tensor(item) for item in joint_positions]
     joint_orientations_t = [torch.tensor(item) for item in joint_orientations]
     joint_orientations_t[path[0]] = \
-        torch.tensor(joint_orientations_t[path[0]], requires_grad=True)
+        joint_orientations_t[path[0]].clone().detach().requires_grad_(True)
     criterion = nn.MSELoss()
-    optimizer = optim.SGD(joint_rot_t, lr=0.01)
+    optimizer = optim.SGD(joint_rot_t, lr=lr)
     loss = torch.tensor(100)
-    while loss.item() > 1e-3:
+    max_iter = 300
+    while loss.item() > 1e-3 and max_iter > 0:
+        max_iter = max_iter - 1
         for i, joint in enumerate(path):
             if i == 0:
                 continue
@@ -226,104 +217,39 @@ def part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, tar
             rotate_point_with_quaternion(
                 joint_offset_t[i], 
                 torch.tensor(joint_orientations[joint_parent[i]])
-            ).detach().numpy()    
+            ).detach().numpy()
     
     return joint_positions, joint_orientations
+
+def part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, target_pose):
+    """
+    完成函数，计算逆运动学
+    输入: 
+        meta_data: 为了方便，将一些固定信息进行了打包，见上面的meta_data类
+        joint_positions: 当前的关节位置，是一个numpy数组，shape为(M, 3)，M为关节数
+        joint_orientations: 当前的关节朝向，是一个numpy数组，shape为(M, 4)，M为关节数
+        target_pose: 目标位置，是一个numpy数组，shape为(3,)
+    输出:
+        经过IK后的姿态
+        joint_positions: 计算得到的关节位置，是一个numpy数组，shape为(M, 3)，M为关节数
+        joint_orientations: 计算得到的关节朝向，是一个numpy数组，shape为(M, 4)，M为关节数
+    """
+    return do_optm(meta_data, joint_positions, joint_orientations, target_pose, lr=0.01)
 
 def part2_inverse_kinematics(meta_data, joint_positions, joint_orientations, relative_x, relative_z, target_height):
     """
     输入lWrist相对于RootJoint前进方向的xz偏移，以及目标高度，IK以外的部分与bvh一致
     """
     tgt_posi = [joint_positions[0][0]+relative_x, target_height, joint_positions[0][2]+relative_z]
-    path, path_name, path1, path2 = meta_data.get_path_from_root_to_end()
-    joint_parent = meta_data.joint_parent
-    target_pose_t = torch.tensor(tgt_posi)
-    joint_offset = [
-        meta_data.joint_initial_position[i] - 
-        meta_data.joint_initial_position[joint_parent[i]]
-        for i in range(len(joint_positions))]
-    joint_offset_t = [torch.tensor(item) for item in joint_offset]
-    joint_rot_t = [
-        torch.tensor(
-            quaternion_multiply(
-                quaternion_inverse(torch.tensor(joint_orientations[joint_parent[i]])), 
-                torch.tensor(joint_orientations[i])
-            ), requires_grad=True)
-        if i in path else
-        torch.tensor(
-            quaternion_multiply(
-                quaternion_inverse(torch.tensor(joint_orientations[joint_parent[i]])), 
-                torch.tensor(joint_orientations[i])
-            ), requires_grad=False)
-        for i in range(len(joint_positions))
-    ]
-    joint_positions_t = [torch.tensor(item) for item in joint_positions]
-    joint_orientations_t = [torch.tensor(item) for item in joint_orientations]
-    joint_orientations_t[path[0]] = \
-        torch.tensor(joint_orientations_t[path[0]], requires_grad=True)
-    criterion = nn.MSELoss()
-    optimizer = optim.SGD(joint_rot_t, lr=0.1)
-    loss = torch.tensor(100)
-    max_iter = 100
-    while loss.item() > 1e-2 and max_iter > 0:
-        max_iter = max_iter - 1
-        for i, joint in enumerate(path):
-            if i == 0: 
-                joint_orientations_t[joint] = quaternion_multiply(
-                        joint_orientations_t[joint_parent[joint]], joint_rot_t[joint]
-                    )
-                # joint_positions_t[i] = joint_positions_t[i]
-                continue
-            # last joint is parent of this joint
-            if path[i-1] == joint_parent[joint]:
-                joint_orientations_t[joint] = \
-                    quaternion_multiply(
-                        joint_orientations_t[joint_parent[joint]], joint_rot_t[joint]
-                    )
-                joint_positions_t[joint] = \
-                    joint_positions_t[joint_parent[joint]] + \
-                    rotate_point_with_quaternion(
-                        joint_offset_t[joint], 
-                        joint_orientations_t[joint_parent[joint]]
-                    )
-            # this joint is parent of last joint
-            else: 
-                joint_orientations_t[joint] = \
-                    quaternion_multiply(
-                        quaternion_inverse(joint_rot_t[path[i-1]]), 
-                        joint_orientations_t[path[i-1]]
-                    )
-                joint_positions_t[joint] = \
-                    joint_positions_t[path[i-1]] - \
-                    rotate_point_with_quaternion(
-                        joint_offset_t[path[i-1]], 
-                        joint_orientations_t[joint]
-                    )
-        loss = criterion(joint_positions_t[path[-1]], target_pose_t)
-        for item in joint_rot_t: 
-            loss += 2*quaternion_loss(item)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        # for item in joint_rot_t: item = F.normalize(item, p=2, dim=0)
-    print("loss: ", loss)
+    return do_optm(meta_data, joint_positions, joint_orientations, tgt_posi, lr=0.1)
     
-    for i in range(1, len(joint_positions)):
-        joint_orientations[i] = quaternion_multiply(
-            torch.tensor(joint_orientations[joint_parent[i]]), 
-            joint_rot_t[i]
-        ).detach().numpy()
-        joint_positions[i] = joint_positions[joint_parent[i]] + \
-            rotate_point_with_quaternion(
-                joint_offset_t[i], 
-                torch.tensor(joint_orientations[joint_parent[i]])
-            ).detach().numpy()    
-    
-    return joint_positions, joint_orientations
-
 def bonus_inverse_kinematics(meta_data, joint_positions, joint_orientations, left_target_pose, right_target_pose):
     """
     输入左手和右手的目标位置，固定左脚，完成函数，计算逆运动学
     """
-    
+    joint_positions, joint_orientations = do_optm(meta_data, joint_positions, joint_orientations, left_target_pose, lr=0.01)
+    meta_data2 = meta_data
+    meta_data2.root_joint = 'rTorso_Clavicle' # 'RootJoint'
+    meta_data2.end_joint = 'rWrist_end'
+    joint_positions, joint_orientations = do_optm(meta_data2, joint_positions, joint_orientations, right_target_pose, lr=0.05)
     return joint_positions, joint_orientations
