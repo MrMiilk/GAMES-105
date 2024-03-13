@@ -46,9 +46,6 @@ class MetaData:
         path_name = [self.joint_name[i] for i in path]
         return path, path_name, path1, path2
     
-
-
-
 def part1_simple(viewer, target_pos):
     """
     完成part1_inverse_kinematics，我们将根节点设在腰部，末端节点设在左手
@@ -166,12 +163,12 @@ def main():
     viewer = SimpleViewer()
     
     # part1
-    part1_simple(viewer, np.array([0.5, 0.75, 0.5]))
+    # part1_simple(viewer, np.array([0.5, 0.75, 0.5]))
     # part1_hard(viewer, np.array([0.5, 0.5, 0.5]))
     # part1_animation(viewer, np.array([0.5, 0.5, 0.5]))
     
     # part2
-    # part2(viewer, 'data/walk60.bvh')
+    part2(viewer, 'lab1/data/walk60.bvh')
     
     # bonus(viewer, np.array([0.5, 0.5, 0.5]), np.array([0, 0.5, 0.5]))
 

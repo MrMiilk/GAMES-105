@@ -2,7 +2,7 @@
 Author: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
 Date: 2024-03-04 10:19:37
 LastEditors: Miilk 1024109095@qq.com
-LastEditTime: 2024-03-10 14:17:43
+LastEditTime: 2024-03-13 21:27:09
 FilePath: /games105/lab1/Lab2_IK_answers.py
 Description: 
 
@@ -159,19 +159,28 @@ def part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, tar
     joint_rot_t = [
         torch.tensor(
             quaternion_multiply(
-                quaternion_inverse(torch.tensor(joint_orientations[i])), 
-                torch.tensor(joint_orientations[joint_parent[i]])
+                quaternion_inverse(torch.tensor(joint_orientations[joint_parent[i]])), 
+                torch.tensor(joint_orientations[i])
             ), requires_grad=True)
+        if i in path else
+        torch.tensor(
+            quaternion_multiply(
+                quaternion_inverse(torch.tensor(joint_orientations[joint_parent[i]])), 
+                torch.tensor(joint_orientations[i])
+            ), requires_grad=False)
         for i in range(len(joint_positions))
     ]
     joint_positions_t = [torch.tensor(item) for item in joint_positions]
     joint_orientations_t = [torch.tensor(item) for item in joint_orientations]
+    joint_orientations_t[path[0]] = \
+        torch.tensor(joint_orientations_t[path[0]], requires_grad=True)
     criterion = nn.MSELoss()
     optimizer = optim.SGD(joint_rot_t, lr=0.01)
     loss = torch.tensor(100)
-    while loss.item() > 1e-4:
+    while loss.item() > 1e-3:
         for i, joint in enumerate(path):
-            if i == 0: continue
+            if i == 0:
+                continue
             # last joint is parent of this joint
             if path[i-1] == joint_parent[joint]:
                 joint_orientations_t[joint] = \
@@ -206,24 +215,18 @@ def part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, tar
         # for item in joint_rot_t: item = F.normalize(item, p=2, dim=0)
     print("loss: ", loss)
     
-    # should update joint_positions&joint_orientations by the 
-    # updated tensors. Do NOT use joint_rot_t[0] as joint_orientations[0]. 
-    # Because the Kinect tree is rooted at the root, which means that 
-    # joint_rot_t[0] == eye().
-    for i in range(len(joint_positions)):
-        if i in path:
-            joint_orientations[i] = joint_orientations_t[i].detach().numpy()
-            joint_positions[i] = joint_positions_t[i].detach().numpy()
-        else:
-            joint_orientations[i] = quaternion_multiply(
-                torch.tensor(joint_orientations[joint_parent[i]]), 
-                joint_rot_t[i]
-            ).detach().numpy()
-            joint_positions[i] = joint_positions[joint_parent[i]] + \
-                rotate_point_with_quaternion(
-                    joint_offset_t[i], 
-                    torch.tensor(joint_orientations[joint_parent[i]])
-                ).detach().numpy()    
+    joint_orientations[0] = joint_orientations_t[0].detach().numpy()
+    joint_positions[0] = joint_positions_t[0].detach().numpy()
+    for i in range(1, len(joint_positions)):
+        joint_orientations[i] = quaternion_multiply(
+            torch.tensor(joint_orientations[joint_parent[i]]), 
+            joint_rot_t[i]
+        ).detach().numpy()
+        joint_positions[i] = joint_positions[joint_parent[i]] + \
+            rotate_point_with_quaternion(
+                joint_offset_t[i], 
+                torch.tensor(joint_orientations[joint_parent[i]])
+            ).detach().numpy()    
     
     return joint_positions, joint_orientations
 
@@ -231,6 +234,90 @@ def part2_inverse_kinematics(meta_data, joint_positions, joint_orientations, rel
     """
     输入lWrist相对于RootJoint前进方向的xz偏移，以及目标高度，IK以外的部分与bvh一致
     """
+    tgt_posi = [joint_positions[0][0]+relative_x, target_height, joint_positions[0][2]+relative_z]
+    path, path_name, path1, path2 = meta_data.get_path_from_root_to_end()
+    joint_parent = meta_data.joint_parent
+    target_pose_t = torch.tensor(tgt_posi)
+    joint_offset = [
+        meta_data.joint_initial_position[i] - 
+        meta_data.joint_initial_position[joint_parent[i]]
+        for i in range(len(joint_positions))]
+    joint_offset_t = [torch.tensor(item) for item in joint_offset]
+    joint_rot_t = [
+        torch.tensor(
+            quaternion_multiply(
+                quaternion_inverse(torch.tensor(joint_orientations[joint_parent[i]])), 
+                torch.tensor(joint_orientations[i])
+            ), requires_grad=True)
+        if i in path else
+        torch.tensor(
+            quaternion_multiply(
+                quaternion_inverse(torch.tensor(joint_orientations[joint_parent[i]])), 
+                torch.tensor(joint_orientations[i])
+            ), requires_grad=False)
+        for i in range(len(joint_positions))
+    ]
+    joint_positions_t = [torch.tensor(item) for item in joint_positions]
+    joint_orientations_t = [torch.tensor(item) for item in joint_orientations]
+    joint_orientations_t[path[0]] = \
+        torch.tensor(joint_orientations_t[path[0]], requires_grad=True)
+    criterion = nn.MSELoss()
+    optimizer = optim.SGD(joint_rot_t, lr=0.1)
+    loss = torch.tensor(100)
+    max_iter = 100
+    while loss.item() > 1e-2 and max_iter > 0:
+        max_iter = max_iter - 1
+        for i, joint in enumerate(path):
+            if i == 0: 
+                joint_orientations_t[joint] = quaternion_multiply(
+                        joint_orientations_t[joint_parent[joint]], joint_rot_t[joint]
+                    )
+                # joint_positions_t[i] = joint_positions_t[i]
+                continue
+            # last joint is parent of this joint
+            if path[i-1] == joint_parent[joint]:
+                joint_orientations_t[joint] = \
+                    quaternion_multiply(
+                        joint_orientations_t[joint_parent[joint]], joint_rot_t[joint]
+                    )
+                joint_positions_t[joint] = \
+                    joint_positions_t[joint_parent[joint]] + \
+                    rotate_point_with_quaternion(
+                        joint_offset_t[joint], 
+                        joint_orientations_t[joint_parent[joint]]
+                    )
+            # this joint is parent of last joint
+            else: 
+                joint_orientations_t[joint] = \
+                    quaternion_multiply(
+                        quaternion_inverse(joint_rot_t[path[i-1]]), 
+                        joint_orientations_t[path[i-1]]
+                    )
+                joint_positions_t[joint] = \
+                    joint_positions_t[path[i-1]] - \
+                    rotate_point_with_quaternion(
+                        joint_offset_t[path[i-1]], 
+                        joint_orientations_t[joint]
+                    )
+        loss = criterion(joint_positions_t[path[-1]], target_pose_t)
+        for item in joint_rot_t: 
+            loss += 2*quaternion_loss(item)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        # for item in joint_rot_t: item = F.normalize(item, p=2, dim=0)
+    print("loss: ", loss)
+    
+    for i in range(1, len(joint_positions)):
+        joint_orientations[i] = quaternion_multiply(
+            torch.tensor(joint_orientations[joint_parent[i]]), 
+            joint_rot_t[i]
+        ).detach().numpy()
+        joint_positions[i] = joint_positions[joint_parent[i]] + \
+            rotate_point_with_quaternion(
+                joint_offset_t[i], 
+                torch.tensor(joint_orientations[joint_parent[i]])
+            ).detach().numpy()    
     
     return joint_positions, joint_orientations
 
